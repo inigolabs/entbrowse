@@ -1,0 +1,14 @@
+{{if isNonEmptySlice .}}
+	<table class="list-table">
+	<thead>
+	<tr>
+	{{range reflectStructKeys (index . 0)}} <th>{{.}}</th>
+	{{end}}</tr>{{range .}}
+	<tr>
+	</thead>
+	<tbody>
+	{{range reflectStructValues .}} <td>{{.}}</td>
+	{{end}}</tr>{{end}}
+	</tbody>
+	</table>
+{{end}}

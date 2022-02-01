@@ -1,0 +1,51 @@
+{{/* entity table header */}}
+<table class="entity-table">
+<thead><tr><th>
+{{with $t := reflectStructType .}}
+	<a href="/{{$t}}">{{$t}}</a>
+{{end}}
+</th><th></th></tr></thead>
+
+
+{{/* entity table data */}}
+<tbody>
+{{range reflectStructItems .}}
+<tr>{{range .}}<td><pre>{{pretty .}}</pre></td>{{end}}</tr>
+{{end}}
+</tbody>
+</table>
+
+{{/* edges tables */}}
+{{if reflectHasField . "Edges"}}
+{{range reflectStructItems .Edges}}
+		<table class="entity-table">
+		<caption>{{(index . 0)}}</caption>
+
+		{{with $items := (index . 1)}}
+			{{if isSlice $items}}
+				{{if isNonEmptySlice $items}}
+					{{/* multiple edges */}}
+					<thead>
+						<tr>{{range reflectStructKeys (index $items 0)}}<th>{{.}}</th>{{end}}</tr>
+					</thead>
+
+					<tbody>
+						{{range $items}}
+							<tr>{{range reflectStructValues .}}<td>{{.}}</td>{{end}}</tr>
+						{{end}}
+					</tbody>
+				{{end}}
+			{{else}}
+				{{/* single unique edge */}}
+				<thead>
+					<tr>{{range reflectStructKeys $items}}<th>{{.}}</th>{{end}}</tr>
+				</thead>
+
+				<tbody>
+					<tr>{{range reflectStructValues $items}}<td>{{.}}</td>{{end}}</tr>
+				</tbody>
+			{{end}}
+		{{end}}
+		</table>
+{{end}}
+{{end}}

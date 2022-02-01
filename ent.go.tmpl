@@ -1,0 +1,66 @@
+{{/* gotype: entgo.io/ent/entc/gen.Graph */}}
+
+{{ define "browse" }}
+
+{{ $pkg := base $.Config.Package }}
+{{ template "header" $ }}
+
+func NewBrowseInterface(ent *Client) *browse {
+	return &browse{
+		ent: ent,
+	}
+}
+
+type browse struct {
+	ent *Client
+}
+
+func (browse) Types() []string {
+	return []string {
+		{{range $node := $.Nodes}} "{{$node.Name}}",
+		{{end}}
+	}
+}
+
+func (browse) Schema(typeName string) ent.Interface {
+	switch typeName {
+	{{range $node := $.Nodes}}
+	case "{{$node.Name}}":
+		return schema.{{$node.Name}}{}
+	{{end}}
+	}
+	return nil
+}
+
+func (b *browse) Count(ctx context.Context, entityType string) int {
+	switch entityType {
+    {{range $node := $.Nodes}}
+	case "{{$node.Name}}":
+		return b.ent.{{$node.Name}}.Query().CountX(ctx)
+    {{- end -}}
+	}
+	panic(fmt.Errorf("unknown entity type %s", entityType))
+}
+
+func (b *browse) List(ctx context.Context, entityType string) interface{} {
+	switch entityType {
+    {{range $node := $.Nodes}}
+	case "{{$node.Name}}":
+		return b.ent.{{$node.Name}}.Query().AllX(ctx)
+    {{- end -}}
+	}
+	panic(fmt.Errorf("unknown entity type %s", entityType))
+}
+
+func (b *browse) Object(ctx context.Context, entityType string, entityID int64) interface{} {
+	switch entityType {
+    {{range $node := $.Nodes}}
+	case "{{$node.Name}}":
+		return b.ent.{{$node.Name}}.Query().{{range $node.Edges}}
+		With{{pascal .Name}}().{{end}}
+		Where({{lower $node.Name}}.IDEQ(entityID)).OnlyX(ctx)
+    {{- end -}}
+	}
+	panic(fmt.Errorf("unknown entity type %s", entityType))
+}
+{{- end}}
