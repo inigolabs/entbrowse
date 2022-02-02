@@ -1,0 +1,324 @@
+{{/* gotype: entgo.io/ent/entc/gen.Graph */}}
+
+{{ define "loader" }}
+
+{{ $pkg := base $.Config.Package }}
+{{ template "header" $ }}
+
+import (
+	yaml "github.com/goccy/go-yaml"
+)
+
+func (c *Client)LoadYML(ctx context.Context, reader io.Reader) error {
+	return LoadYML(ctx, reader, c)
+}
+
+func (c *Client)LoadJson(ctx context.Context, reader io.Reader) error {
+	return LoadJson(ctx, reader, c)
+}
+
+func (c *Client)WriteInput(ctx context.Context, writer io.Writer) error {
+	return WriteInput(ctx, writer, c)
+}
+
+func (c *Client)DumpInput(ctx context.Context) interface{} {
+	return DumpInput(ctx, c)
+}
+
+func (c *Client)WriteOutput(ctx context.Context, writer io.Writer) error {
+	return WriteOutput(ctx, writer, c)
+}
+
+func (c *Client)DumpOutput(ctx context.Context) interface{} {
+	return DumpOutput(ctx, c)
+}
+
+func (c *Client)Clear(ctx context.Context) {
+	Clear(ctx, c)
+}
+
+func LoadYML(ctx context.Context, reader io.Reader, client *Client) error {
+	var input Input
+	decoder := yaml.NewDecoder(reader)
+	err := decoder.Decode(&input)
+	if err != nil {
+		return err
+	}
+	loadInput(ctx, &input, client)
+	return nil
+}
+
+func LoadJson(ctx context.Context, reader io.Reader, client *Client) error {
+	var input Input
+	decoder := json.NewDecoder(reader)
+	err := decoder.Decode(&input)
+	if err != nil {
+		return err
+	}
+	loadInput(ctx, &input, client)
+	return nil
+}
+
+func LoadInput(ctx context.Context, input *Input, client *Client) {
+	loadInput(ctx, input, client)
+}
+
+func WriteInput(ctx context.Context, writer io.Writer, client *Client) error {
+	input := DumpInput(ctx, client)
+	encoder := yaml.NewEncoder(writer)
+	err := encoder.Encode(input)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func DumpInput(ctx context.Context, client *Client) *Input {
+	return dumpInput(ctx, client)
+}
+
+func WriteOutput(ctx context.Context, writer io.Writer, client *Client) error {
+	input := DumpOutput(ctx, client)
+	encoder := yaml.NewEncoder(writer)
+	err := encoder.Encode(input)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func DumpOutput(ctx context.Context, client *Client) *Output {
+	return dumpOutput(ctx, client)
+}
+
+func Clear(ctx context.Context, client *Client) {
+	{{- range $node := $.Nodes}}
+	client.{{ $node.Name}}.Delete().Where().ExecX(ctx)
+	{{- end}}	
+}
+
+type InputID = int
+type OutputID = int
+
+// Input holds the top level data for all nodes in the schema
+type Input struct {
+	{{- range $node := $.Nodes}}
+	{{ $node.Name }} []*{{ $node.Name }}Input `yaml:"{{ lower $node.Name }}"`
+	{{- end }}
+}
+
+// Output holds the top level data for all nodes in the schema
+type Output struct {
+	{{- range $node := $.Nodes}}
+	{{ $node.Name }} []*{{ $node.Name }}Output `yaml:"{{ lower $node.Name }}"`
+	{{- end }}
+}
+
+{{- range $node := $.Nodes}}
+
+// {{ $node.Name }}Input is the load model entity for the {{ $node.Name }} schema.
+type {{ $node.Name }}Input struct {
+	ID *{{ $node.ID.Type }} `json:"id,omitempty"`
+
+	{{- range $f := $node.Fields }}
+		{{- $tag := $f.StructTag }}{{ with $tags := $node.Annotations.Fields.StructTag }}{{ with index $tags $f.Name }}{{ $tag = . }}{{ end }}{{ end }}
+		{{ $f.StructField }} {{ if $f.NillableValue }}*{{ end }}{{ $f.Type }} {{ if not $f.Sensitive }}`{{ $tag }}`{{ else }}{{ template "model/omittags" $ }}{{ end }}
+	{{- end }}
+
+	Edges {{ $node.Name }}EdgeInput {{ template "model/edgetags" $ }}
+}
+
+// {{ $node.Name }}Output is the dump model entity for the {{ $node.Name }} schema.
+type {{ $node.Name }}Output struct {
+	ID {{ $node.ID.Type }} `json:"id,omitempty"`
+
+	{{- range $f := $node.Fields }}
+		{{- $tag := $f.StructTag }}{{ with $tags := $node.Annotations.Fields.StructTag }}{{ with index $tags $f.Name }}{{ $tag = . }}{{ end }}{{ end }}
+		{{ $f.StructField }} {{ if $f.NillableValue }}*{{ end }}{{ $f.Type }} {{ if not $f.Sensitive }}`{{ $tag }}`{{ else }}{{ template "model/omittags" $ }}{{ end }}
+	{{- end }}
+
+	Edges {{ $node.Name }}EdgeInput {{ template "model/edgetags" $ }}
+}
+
+// {{ $node.Name }}EdgeInput holds the relations/edges for other nodes in the graph.
+type {{ $node.Name }}EdgeInput struct {
+	{{- range $e := $node.Edges }}
+		{{- if $e.Inverse }}{{ else }}
+			{{ $e.StructField }} {{ if not $e.Unique }}[]{{ end }}InputID {{ with $e.StructTag }}`{{ . }}`{{ end }}
+		{{- end }}
+	{{- end }}
+}
+
+func (pc *{{ $node.Name }}Create) With{{ $node.Name }}Input(p *{{ $node.Name }}Input) *{{ $node.Name}}Create {
+	{{ range $f := $node.Fields }}
+	{{ if $f.NillableValue }}
+	if p.{{ $f.StructField }} != nil {
+		pc.mutation.Set{{ $f.StructField }}(*p.{{ $f.StructField }})
+	} 
+	{{- else -}}
+	pc.mutation.Set{{ $f.StructField }}(p.{{ $f.StructField }})
+	{{- end -}}
+	{{ end }}
+	return pc
+}
+
+{{- end }}
+
+func loadInput(ctx context.Context, input *Input, client *Client) {
+	{{- range $node := $.Nodes}}
+	{{ camel $node.Name }}Map := make(map[InputID]*{{ $node.Name}})
+	{{- end }}
+
+	// load required objects
+	{{ range $node := $.Nodes}}
+	{{ if hasRequiredEdgeRef $node }}
+	for id, obj := range input.{{ $node.Name }} {
+		{{ camel $node.Name }}Map[id] = client.{{ $node.Name }}.Create().
+			With{{ $node.Name }}Input(obj).SaveX(ctx)
+	}
+	{{ end }}
+	{{ end }}
+
+	// load objects
+	{{ range $node := $.Nodes}}
+	{{ if not (hasRequiredEdgeRef $node) }}
+	for id, obj := range input.{{ $node.Name }} {
+		{{ camel $node.Name }}Map[id] = client.{{ $node.Name }}.Create().
+			With{{ $node.Name }}Input(obj).
+			{{ range $edge := $node.Edges }}
+			{{ if not $edge.Optional }}
+			Set{{ pascal $edge.Name }}({{ camel $edge.Type.Name }}Map[0]).
+			{{ end }}
+			{{ end }}
+			SaveX(ctx)
+	}
+	{{ end }}
+	{{ end }}
+
+	// load edges
+	{{ range $node := $.Nodes}}
+	for id, obj := range input.{{ $node.Name }} {
+		u := client.{{ $node.Name }}.UpdateOne({{ camel $node.Name }}Map[id])
+
+		{{ range $edge := $node.Edges }}
+			{{- if $edge.Inverse }}{{ else }}
+				{{- if $edge.Unique }}
+				{{- if $edge.Optional }}
+				if mapobj, found := {{ camel $edge.Type.Name }}Map[obj.Edges.{{ $edge.StructField }}]; found {
+					u.Set{{ $edge.StructField }}(mapobj)
+				}
+				{{- end }}
+				{{- else }}
+				for _, iid := range obj.Edges.{{ $edge.StructField }} {
+					u.Add{{ $edge.StructField }}({{ camel $edge.Type.Name }}Map[iid])
+				}
+				{{- end }}
+			{{ end }}
+		{{ end }}
+
+		_ = obj
+		u.SaveX(ctx)
+	}
+	{{- end -}}
+}
+
+func dumpInput(ctx context.Context, client *Client) *Input {
+	var input Input
+
+	{{- range $node := $.Nodes}}
+	{{camel $node.Name}}Map := make(map[{{$node.ID.Type}}]InputID)
+	{{- end }}
+
+    {{range $node := $.Nodes}}
+	{{camel $node.Name}}Objects := client.{{$node.Name}}.Query().{{range $node.Edges}}
+		With{{pascal .Name}}().{{end}}
+		AllX(ctx)
+	input.{{pascal $node.Name}} = make([]*{{pascal $node.Name}}Input, len({{camel $node.Name}}Objects))
+	for i:=0; i< len({{camel $node.Name}}Objects); i++ {
+		obj := {{camel $node.Name}}Objects[i]
+		inputObj := &{{$node.Name}}Input{
+			{{- range $field := $node.Fields}}
+			{{pascal $field.Name}} : obj.{{pascal $field.Name}},
+			{{- end}}
+		}
+		input.{{$node.Name}}[i] = inputObj
+		{{camel $node.Name}}Map[obj.ID] = i
+	}
+	{{end}}
+
+    {{range $node := $.Nodes}}
+	for i:=0; i< len({{camel $node.Name}}Objects); i++ {
+		obj := {{camel $node.Name}}Objects[i]
+		inputObj := input.{{$node.Name}}[i]
+		{{ range $edge := $node.Edges}}
+		{{- if not $edge.Inverse}}
+		{{- if $edge.Unique}}
+		if obj.Edges.{{pascal $edge.Name}} != nil {
+			inputObj.Edges.{{pascal $edge.Name}} = {{camel $node.Name}}Map[obj.Edges.{{pascal $edge.Name}}.ID]
+		}
+		{{- else }}
+		for _, edgeObj := range obj.Edges.{{pascal $edge.Name}} {
+			inputObj.Edges.{{pascal $edge.Name}} = append(inputObj.Edges.{{pascal $edge.Name}}, {{camel $edge.Type.Name}}Map[edgeObj.ID])
+		}
+		{{- end}}
+		{{- end}}
+		{{- end}}
+		_ = obj
+		_ = inputObj
+	}
+	{{end}}
+
+	return &input
+}
+
+func dumpOutput(ctx context.Context, client *Client) *Output {
+	var output Output
+
+	{{- range $node := $.Nodes}}
+	{{camel $node.Name}}Map := make(map[{{$node.ID.Type}}]OutputID)
+	{{- end }}
+
+    {{range $node := $.Nodes}}
+	{{camel $node.Name}}Objects := client.{{$node.Name}}.Query().{{range $node.Edges}}
+		With{{pascal .Name}}().{{end}}
+		AllX(ctx)
+	output.{{pascal $node.Name}} = make([]*{{pascal $node.Name}}Output, len({{camel $node.Name}}Objects))
+	for i:=0; i< len({{camel $node.Name}}Objects); i++ {
+		obj := {{camel $node.Name}}Objects[i]
+		outputObj := &{{$node.Name}}Output{
+			ID : obj.ID,
+			{{- range $field := $node.Fields}}
+			{{pascal $field.Name}} : obj.{{pascal $field.Name}},
+			{{- end}}
+		}
+		output.{{$node.Name}}[i] = outputObj
+		{{camel $node.Name}}Map[obj.ID] = i
+	}
+	{{end}}
+
+    {{range $node := $.Nodes}}
+	for i:=0; i< len({{camel $node.Name}}Objects); i++ {
+		obj := {{camel $node.Name}}Objects[i]
+		outputObj := output.{{$node.Name}}[i]
+		{{ range $edge := $node.Edges}}
+		{{- if not $edge.Inverse}}
+		{{- if $edge.Unique}}
+		if obj.Edges.{{pascal $edge.Name}} != nil {
+			outputObj.Edges.{{pascal $edge.Name}} = {{camel $node.Name}}Map[obj.Edges.{{pascal $edge.Name}}.ID]
+		}
+		{{- else }}
+		for _, edgeObj := range obj.Edges.{{pascal $edge.Name}} {
+			outputObj.Edges.{{pascal $edge.Name}} = append(outputObj.Edges.{{pascal $edge.Name}}, {{camel $edge.Type.Name}}Map[edgeObj.ID])
+		}
+		{{- end}}
+		{{- end}}
+		{{- end}}
+		_ = obj
+		_ = outputObj
+	}
+	{{end}}
+
+	return &output
+}
+
+{{- end }}
