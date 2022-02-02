@@ -22,6 +22,38 @@ func (browse) Types() []string {
 	}
 }
 
+func (browse) ConvertID(typeName string, id string) interface{} {
+	switch typeName {
+	{{range $node := $.Nodes}}
+	case "{{$node.Name}}":
+		return convertID("{{$node.ID.Type}}", id)
+	{{- end}}
+	default:
+		panic("invalid typename: " + typeName)
+	}
+}
+
+func convertID(idType string, id string) interface{} {
+	switch idType{
+		case "int":
+			id_, err := strconv.Atoi(id)
+			if err != nil {
+				panic(err)
+			}
+			return id_
+		case "int64":
+			id_, err := strconv.ParseInt(id, 10, 64)
+			if err != nil {
+				panic(err)
+			}
+			return id_
+		case "string":
+			return id
+		default:
+			panic("unsupported id type: " + idType)
+	}
+}
+
 func (browse) Schema(typeName string) ent.Interface {
 	switch typeName {
 	{{range $node := $.Nodes}}
@@ -52,13 +84,18 @@ func (b *browse) List(ctx context.Context, entityType string) interface{} {
 	panic(fmt.Errorf("unknown entity type %s", entityType))
 }
 
-func (b *browse) Object(ctx context.Context, entityType string, entityID int64) interface{} {
+func (b *browse) Object(ctx context.Context, entityType string, entityID interface{}) interface{} {
 	switch entityType {
     {{range $node := $.Nodes}}
 	case "{{$node.Name}}":
-		return b.ent.{{$node.Name}}.Query().{{range $node.Edges}}
-		With{{pascal .Name}}().{{end}}
-		Where({{lower $node.Name}}.IDEQ(entityID)).OnlyX(ctx)
+		switch id := entityID.(type) {
+			case {{ $node.ID.Type }}:
+				return b.ent.{{$node.Name}}.Query().{{range $node.Edges}}
+				With{{pascal .Name}}().{{end}}
+				Where({{lower $node.Name}}.IDEQ(id)).OnlyX(ctx)
+			default:
+				panic(fmt.Errorf("invalid id type: %T, expecting {{ $node.ID.Type }}", id))
+		}
     {{- end -}}
 	}
 	panic(fmt.Errorf("unknown entity type %s", entityType))

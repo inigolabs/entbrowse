@@ -111,7 +111,7 @@ func (s *server) listHandler(w http.ResponseWriter, r *http.Request) {
 func (s *server) entityHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	entityType := chi.URLParam(r, "type")
-	entityID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	entityID := s.browser.ConvertID(entityType, chi.URLParam(r, "id"))
 	w.Header().Add("Content-Type", "text/html")
 	_, err := w.Write(htmlHeader)
 	check(err)
@@ -219,7 +219,7 @@ func reflectStructValues(obj interface{}) []interface{} {
 		if v.Field(i).CanInterface() {
 			name := v.Type().Field(i).Name
 			if name == "ID" {
-				val := fmt.Sprint(v.Field(i).Interface().(int64))
+				val := fmt.Sprint(v.Field(i).Interface())
 				link := linkify(val, "/"+typeName+"/"+val)
 				out = append(out, link)
 			} else if name != "Edges" {

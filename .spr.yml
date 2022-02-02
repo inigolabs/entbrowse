@@ -1,0 +1,7 @@
+githubRepoOwner: inigolabs
+githubRepoName: entbrowse
+githubHost: github.com
+requireChecks: false
+requireApproval: true
+githubRemote: origin
+githubBranch: master
