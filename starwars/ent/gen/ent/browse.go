@@ -123,21 +123,105 @@ func (b *browse) Count(ctx context.Context, entityType string) int {
 	panic(fmt.Errorf("unknown entity type %s", entityType))
 }
 
-func (b *browse) List(ctx context.Context, entityType string) interface{} {
+func (b *browse) List(ctx context.Context, entityType string, limit, offset *int, sortField string, ascSort bool) interface{} {
 	switch entityType {
 
 	case "Film":
-		return b.ent.Film.Query().AllX(ctx)
+		query := b.ent.Film.Query()
+		if limit != nil {
+			query = query.Limit(*limit)
+		}
+		if offset != nil {
+			query = query.Offset(*offset)
+		}
+		if sortField != "" {
+			if ascSort {
+				query = query.Order(Asc(sortField))
+			} else {
+				query = query.Order(Desc(sortField))
+			}
+		}
+		return query.AllX(ctx)
 	case "Person":
-		return b.ent.Person.Query().AllX(ctx)
+		query := b.ent.Person.Query()
+		if limit != nil {
+			query = query.Limit(*limit)
+		}
+		if offset != nil {
+			query = query.Offset(*offset)
+		}
+		if sortField != "" {
+			if ascSort {
+				query = query.Order(Asc(sortField))
+			} else {
+				query = query.Order(Desc(sortField))
+			}
+		}
+		return query.AllX(ctx)
 	case "Planet":
-		return b.ent.Planet.Query().AllX(ctx)
+		query := b.ent.Planet.Query()
+		if limit != nil {
+			query = query.Limit(*limit)
+		}
+		if offset != nil {
+			query = query.Offset(*offset)
+		}
+		if sortField != "" {
+			if ascSort {
+				query = query.Order(Asc(sortField))
+			} else {
+				query = query.Order(Desc(sortField))
+			}
+		}
+		return query.AllX(ctx)
 	case "Species":
-		return b.ent.Species.Query().AllX(ctx)
+		query := b.ent.Species.Query()
+		if limit != nil {
+			query = query.Limit(*limit)
+		}
+		if offset != nil {
+			query = query.Offset(*offset)
+		}
+		if sortField != "" {
+			if ascSort {
+				query = query.Order(Asc(sortField))
+			} else {
+				query = query.Order(Desc(sortField))
+			}
+		}
+		return query.AllX(ctx)
 	case "Starship":
-		return b.ent.Starship.Query().AllX(ctx)
+		query := b.ent.Starship.Query()
+		if limit != nil {
+			query = query.Limit(*limit)
+		}
+		if offset != nil {
+			query = query.Offset(*offset)
+		}
+		if sortField != "" {
+			if ascSort {
+				query = query.Order(Asc(sortField))
+			} else {
+				query = query.Order(Desc(sortField))
+			}
+		}
+		return query.AllX(ctx)
 	case "Vehicle":
-		return b.ent.Vehicle.Query().AllX(ctx)
+		query := b.ent.Vehicle.Query()
+		if limit != nil {
+			query = query.Limit(*limit)
+		}
+		if offset != nil {
+			query = query.Offset(*offset)
+		}
+		if sortField != "" {
+			if ascSort {
+				query = query.Order(Asc(sortField))
+			} else {
+				query = query.Order(Desc(sortField))
+			}
+		}
+		return query.AllX(ctx)
 	}
 	panic(fmt.Errorf("unknown entity type %s", entityType))
 }
