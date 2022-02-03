@@ -1,14 +1,44 @@
-{{if isNonEmptySlice .}}
+{{if isNonEmptySlice .List}}
 	<table class="list-table">
 	<thead>
 	<tr>
-	{{range reflectStructKeys (index . 0)}} <th>{{.}}</th>
-	{{end}}</tr>{{range .}}
-	<tr>
+	{{range reflectStructKeys (index .List 0)}} <th>{{.}}</th>
+	{{end}}</tr>
 	</thead>
 	<tbody>
+	{{range .List}}
+	<tr>
 	{{range reflectStructValues .}} <td>{{.}}</td>
-	{{end}}</tr>{{end}}
+	{{end}}</tr>
+	{{end}}
 	</tbody>
 	</table>
+	{{if .PaginationEnabled}}
+	<div class="pagination">
+	    <div>
+	    {{ if isNotNil .PrevPage}}
+        <a href="{{.PrevPage}}"><button>Prev Page</button></a>
+        {{end}}
+	    </div>
+
+        <div>
+        <label class="pagination-options">
+        <select onchange="location = `?limit=${this.value}`;">
+        {{range $index, $element := .PageOptions}}
+        <option {{if $element}} selected {{end}}>{{$index}}</option>
+        {{end}}
+        </select
+        rows per page
+        </label>
+	    </div>
+
+	    <div>
+	    {{ if isNotNil .NextPage}}
+        <a href="{{.NextPage}}"><button>Next Page</button></a>
+        {{end}}
+	    </div>
+
+	    <div><span class="pagination-info">{{.PageInfo}} records shown</span></div>
+    </div>
+    {{end}}
 {{end}}

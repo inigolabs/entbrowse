@@ -3,6 +3,7 @@ package entbrowse
 import (
 	"embed"
 	"fmt"
+	"math"
 	"net/http"
 	"reflect"
 	"sort"
@@ -31,6 +32,15 @@ var (
 
 	json = jsoniter.ConfigCompatibleWithStandardLibrary
 )
+
+type listEntity struct {
+	List              interface{}
+	PageOptions       map[int]bool
+	PrevPage          *string
+	NextPage          *string
+	PageInfo          string
+	PaginationEnabled bool
+}
 
 func Template() *gen.Template {
 	return gen.MustParse(
@@ -87,10 +97,11 @@ func (s *server) rootHandler(w http.ResponseWriter, r *http.Request) {
 			Count:  s.browser.Count(ctx, name),
 		})
 	}
+	list := listEntity{List: data}
 	w.Header().Add("Content-Type", "text/html")
 	_, err := w.Write(htmlHeader)
 	check(err)
-	err = s.listTemplate.Execute(w, data)
+	err = s.listTemplate.Execute(w, list)
 	check(err)
 	_, err = w.Write(htmlFooter)
 	check(err)
@@ -102,7 +113,52 @@ func (s *server) listHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/html")
 	_, err := w.Write(htmlHeader)
 	check(err)
-	err = s.listTemplate.Execute(w, s.browser.List(ctx, entityType))
+	model := listEntity{
+		PageOptions: map[int]bool{
+			5:   false,
+			10:  false,
+			50:  false,
+			100: false,
+			500: false,
+		},
+		PaginationEnabled: true,
+	}
+	var limit, offset int
+	limitQuery, er := strconv.ParseInt(r.URL.Query().Get("limit"), 10, 32)
+	if er == nil {
+		limit = int(limitQuery)
+	}
+
+	if limit == 0 {
+		// default limit
+		limit = 100
+	}
+
+	model.PageOptions[limit] = true
+
+	offsetQuery, er := strconv.ParseInt(r.URL.Query().Get("offset"), 10, 32)
+	if er == nil {
+		offset = int(offsetQuery)
+	}
+
+	count := s.browser.Count(ctx, entityType)
+	model.List = s.browser.List(ctx, entityType, &limit, &offset)
+	listSize := sliceLen(model.List)
+
+	if offset > 0 {
+		newOffset := int(math.Max(float64(offset-listSize), 0))
+		prevPage := fmt.Sprintf("?limit=%d&offset=%d", limit, newOffset)
+		model.PrevPage = &prevPage
+	}
+
+	if offset+listSize < count {
+		nextPage := fmt.Sprintf("?limit=%d&offset=%d", limit, offset+listSize)
+		model.NextPage = &nextPage
+	}
+
+	model.PageInfo = fmt.Sprintf("%d ... %d of %d", offset, offset+listSize, count)
+
+	err = s.listTemplate.Execute(w, model)
 	check(err)
 	_, err = w.Write(htmlFooter)
 	check(err)
@@ -140,6 +196,7 @@ var templateFuncs = template.FuncMap{
 	"reflectStructValues": reflectStructValues,
 	"reflectStructItems":  reflectStructItems,
 	"reflectHasField":     reflectHasField,
+	"isNotNil":            isNotNil,
 }
 
 func pretty(obj interface{}) string {
@@ -272,4 +329,15 @@ func reflectHasField(v interface{}, name string) bool {
 		return false
 	}
 	return rv.FieldByName(name).IsValid()
+}
+
+func isNotNil(v interface{}) bool {
+	return v != nil && !reflect.ValueOf(v).IsNil()
+}
+
+func sliceLen(v interface{}) int {
+	if reflect.TypeOf(v).Kind() == reflect.Slice {
+		return reflect.ValueOf(v).Len()
+	}
+	return 0
 }

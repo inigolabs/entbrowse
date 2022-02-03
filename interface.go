@@ -16,7 +16,7 @@ type Browser interface {
 	Count(ctx context.Context, entityType string) int
 
 	// List returns a list of entities
-	List(ctx context.Context, entityType string) interface{}
+	List(ctx context.Context, entityType string, limit, offset *int) interface{}
 
 	// Object returns a particualr entity including all it's edges
 	Object(ctx context.Context, typeName string, id interface{}) interface{}
