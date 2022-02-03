@@ -74,7 +74,7 @@ func (b *browse) Count(ctx context.Context, entityType string) int {
 	panic(fmt.Errorf("unknown entity type %s", entityType))
 }
 
-func (b *browse) List(ctx context.Context, entityType string, limit, offset *int) interface{} {
+func (b *browse) List(ctx context.Context, entityType string, limit, offset *int, sortField string, ascSort bool) interface{} {
 	switch entityType {
     {{range $node := $.Nodes}}
 	case "{{$node.Name}}":
@@ -84,6 +84,13 @@ func (b *browse) List(ctx context.Context, entityType string, limit, offset *int
 	    }
 	    if offset != nil {
 	        query = query.Offset(*offset)
+	    }
+	    if sortField != "" {
+	        if ascSort {
+	            query = query.Order(Asc(sortField))
+	        } else {
+	            query = query.Order(Desc(sortField))
+	        }
 	    }
 		return query.AllX(ctx)
     {{- end -}}

@@ -6,8 +6,10 @@ import (
 	"math"
 	"net/http"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"text/template"
 
 	"entgo.io/ent/entc/gen"
@@ -34,12 +36,15 @@ var (
 )
 
 type listEntity struct {
+	Limit             int
+	SortQuery         string
 	List              interface{}
 	PageOptions       map[int]bool
 	PrevPage          *string
 	NextPage          *string
 	PageInfo          string
 	PaginationEnabled bool
+	SortEnabled       bool
 }
 
 func Template() *gen.Template {
@@ -122,8 +127,21 @@ func (s *server) listHandler(w http.ResponseWriter, r *http.Request) {
 			500: false,
 		},
 		PaginationEnabled: true,
+		SortEnabled:       true,
 	}
 	var limit, offset int
+	orderBy := r.URL.Query().Get("orderBy")
+	ascSort := r.URL.Query().Get("sortOrder") != "DESC"
+
+	if orderBy != "" {
+		model.SortQuery = fmt.Sprintf("&orderBy=%s", orderBy)
+		if ascSort {
+			model.SortQuery += "&sortOrder=ASC"
+		} else {
+			model.SortQuery += "&sortOrder=DESC"
+		}
+	}
+
 	limitQuery, er := strconv.ParseInt(r.URL.Query().Get("limit"), 10, 32)
 	if er == nil {
 		limit = int(limitQuery)
@@ -134,6 +152,7 @@ func (s *server) listHandler(w http.ResponseWriter, r *http.Request) {
 		limit = 100
 	}
 
+	model.Limit = limit
 	model.PageOptions[limit] = true
 
 	offsetQuery, er := strconv.ParseInt(r.URL.Query().Get("offset"), 10, 32)
@@ -142,17 +161,17 @@ func (s *server) listHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	count := s.browser.Count(ctx, entityType)
-	model.List = s.browser.List(ctx, entityType, &limit, &offset)
+	model.List = s.browser.List(ctx, entityType, &limit, &offset, toSnakeCase(orderBy), ascSort)
 	listSize := sliceLen(model.List)
 
 	if offset > 0 {
 		newOffset := int(math.Max(float64(offset-listSize), 0))
-		prevPage := fmt.Sprintf("?limit=%d&offset=%d", limit, newOffset)
+		prevPage := fmt.Sprintf("?limit=%d&offset=%d%s", limit, newOffset, model.SortQuery)
 		model.PrevPage = &prevPage
 	}
 
 	if offset+listSize < count {
-		nextPage := fmt.Sprintf("?limit=%d&offset=%d", limit, offset+listSize)
+		nextPage := fmt.Sprintf("?limit=%d&offset=%d%s", limit, offset+listSize, model.SortQuery)
 		model.NextPage = &nextPage
 	}
 
@@ -197,6 +216,7 @@ var templateFuncs = template.FuncMap{
 	"reflectStructItems":  reflectStructItems,
 	"reflectHasField":     reflectHasField,
 	"isNotNil":            isNotNil,
+	"isSortActive":        isSortActive,
 }
 
 func pretty(obj interface{}) string {
@@ -340,4 +360,18 @@ func sliceLen(v interface{}) int {
 		return reflect.ValueOf(v).Len()
 	}
 	return 0
+}
+
+func isSortActive(sortQuery, orderBy, sortOrder string) bool {
+	return sortQuery == fmt.Sprintf("&orderBy=%s&sortOrder=%s", orderBy, sortOrder)
+}
+
+// @FIXME - this is tricky, need to find more reliable way to convert fieldName into column name in the DB
+var matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
+var matchAllCap = regexp.MustCompile("([a-z0-9])([A-Z])")
+
+func toSnakeCase(str string) string {
+	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
+	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
+	return strings.ToLower(snake)
 }
