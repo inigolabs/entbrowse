@@ -2,7 +2,16 @@
 	<table class="list-table">
 	<thead>
 	<tr>
-	{{range reflectStructKeys (index .List 0)}} <th>{{.}}</th>
+	{{$limit := .Limit}}
+	{{$sort := .SortQuery}}
+	{{$sortEnabled := .SortEnabled}}
+	{{range reflectStructKeys (index .List 0)}}
+	<th>{{.}}
+	{{if $sortEnabled}}
+	<span class="sort_asc {{if isSortActive $sort . "ASC"}}{{"active"}}{{end}}" onclick="location ='?limit={{$limit}}&orderBy={{.}}&sortOrder=ASC';"></span>
+	<span class="sort_desc {{if isSortActive $sort . "DESC"}}{{"active"}}{{end}}" onclick="location ='?limit={{$limit}}&orderBy={{.}}&sortOrder=DESC';"></span>
+	{{end}}
+	</th>
 	{{end}}</tr>
 	</thead>
 	<tbody>
@@ -23,7 +32,7 @@
 
         <div>
         <label class="pagination-options">
-        <select onchange="location = `?limit=${this.value}`;">
+        <select onchange="location = `?limit=${this.value}{{.SortQuery}}`;">
         {{range $index, $element := .PageOptions}}
         <option {{if $element}} selected {{end}}>{{$index}}</option>
         {{end}}

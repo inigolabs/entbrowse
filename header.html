@@ -18,8 +18,38 @@
 }
 .list-table th,
 .list-table td {
-    padding: 12px 15px;
+    position: relative;
+    padding: 12px 30px 12px 15px;
 }
+
+.list-table .sort_asc,
+.list-table .sort_desc {
+    border: 8px solid transparent;
+    content: "";
+    display: block;
+    height: 0;
+    right: 5px;
+    top: 50%;
+    position: absolute;
+    width: 0;
+    cursor: pointer;
+    opacity: 0.5;
+}
+
+.list-table .sort_asc {
+    border-bottom-color: #ffffff;
+    margin-top: -20px;
+}
+
+.list-table .sort_desc {
+    border-top-color: #ffffff;
+    margin-top: 2px;
+}
+
+.sort_asc.active, .sort_desc.active {
+    opacity: 1;
+}
+
 .list-table tbody tr {
     border-bottom: 1px solid #dddddd;
 }
@@ -75,7 +105,7 @@
 }
 
 .pagination > div {
-    flex: 1;
+    flex: 0 0 auto;
 }
 
 .pagination-options {
